@@ -1,7 +1,10 @@
 package com.bussinessmanagement.managementSystem.Services;
 
+import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -9,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.bussinessmanagement.managementSystem.Models.*;
 import com.bussinessmanagement.managementSystem.Models.DTOs.Request.TicketRequestDTO;
+import com.bussinessmanagement.managementSystem.Models.DTOs.Response.TicketResponseDTO;
 import com.bussinessmanagement.managementSystem.Repositories.*;
 import com.bussinessmanagement.managementSystem.enums.*;
 
@@ -19,14 +23,13 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final EventRepository eventRepository;
 
-    public Ticket comprarBilhete(TicketRequestDTO dto) {
+    public TicketResponseDTO comprarBilhete(TicketRequestDTO dto) {
 
         User user = (User) SecurityContextHolder
                 .getContext()
                 .getAuthentication()
                 .getPrincipal();
 
-        // ✅ Apenas CLIENT pode comprar
         if (user.getRole() != Role.CLIENT) {
             throw new RuntimeException("Apenas clientes podem comprar bilhetes.");
         }
@@ -34,7 +37,6 @@ public class TicketService {
         Event event = eventRepository.findById(dto.eventId())
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
 
-        // ✅ Verificar lotação
         if (event.getBilhetesVendidos() >= event.getLotacaoTotal()) {
             throw new RuntimeException("Evento esgotado.");
         }
@@ -45,14 +47,37 @@ public class TicketService {
         ticket.setTipo(dto.tipo());
         ticket.setFormato(dto.formato());
         ticket.setEstado(TicketState.VALIDO);
-
-        // 🔥 Gerar QR único
         ticket.setQrCode(gerarQrUnico());
 
-        // atualizar contagem
         event.setBilhetesVendidos(event.getBilhetesVendidos() + 1);
 
-        return ticketRepository.save(ticket);
+        Ticket saved = ticketRepository.save(ticket);
+
+        return toDTO(saved);
+    }
+
+    public Page<TicketResponseDTO> listarTicketsVendidos(Pageable pageable) {
+
+        List<TicketState> estados = List.of(
+                TicketState.VALIDO,
+                TicketState.USADO);
+
+        return ticketRepository
+                .findByEstadoIn(estados, pageable)
+                .map(this::toDTO);
+    }
+
+    public Page<TicketResponseDTO> listarTicketsPorEvento(
+            Long eventId,
+            Pageable pageable) {
+
+        if (!eventRepository.existsById(eventId)) {
+            throw new RuntimeException("Evento não encontrado");
+        }
+
+        return ticketRepository
+                .findByEventId(eventId, pageable)
+                .map(this::toDTO);
     }
 
     private String gerarQrUnico() {
@@ -83,5 +108,18 @@ public class TicketService {
         ticketRepository.save(ticket);
 
         return "Bilhete válido ✅ Entrada permitida";
+    }
+
+    private TicketResponseDTO toDTO(Ticket ticket) {
+        return new TicketResponseDTO(
+                ticket.getId(),
+                ticket.getEvent().getId(),
+                ticket.getEvent().getName(),
+                ticket.getClient().getId(),
+                ticket.getClient().getFullName(),
+                ticket.getTipo(),
+                ticket.getFormato(),
+                ticket.getEstado(),
+                ticket.getQrCode());
     }
 }
