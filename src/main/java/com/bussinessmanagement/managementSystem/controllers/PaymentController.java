@@ -10,7 +10,7 @@ import com.bussinessmanagement.managementSystem.Models.DTOs.Request.PaymentReque
 import com.bussinessmanagement.managementSystem.Services.PaymentService;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("api/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 

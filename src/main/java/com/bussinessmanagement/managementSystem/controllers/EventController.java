@@ -16,7 +16,7 @@ import com.bussinessmanagement.managementSystem.Services.EventService;
 import com.bussinessmanagement.managementSystem.enums.EventStatus;
 
 @RestController
-@RequestMapping("/events")
+@RequestMapping("api/events")
 @RequiredArgsConstructor
 public class EventController {
 

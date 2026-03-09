@@ -36,7 +36,7 @@ public class EventService {
         event.setPrecoVip(dto.precoVip());
         event.setLotacaoTotal(dto.lotacaoTotal());
         event.setEstado(EventStatus.ATIVO);
-
+        event.setBilhetesVendidos(0);
        return toDTO(eventRepository.save(event));
     }
 

@@ -3,6 +3,7 @@ package com.bussinessmanagement.managementSystem.Services;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,11 +20,16 @@ import com.bussinessmanagement.managementSystem.enums.*;
 @Service
 @RequiredArgsConstructor
 public class TicketService {
+    @Autowired
+    private TicketRepository ticketRepository;
+    @Autowired
+    private EventRepository eventRepository;
+    @Autowired
+    private QRCodeService qrCodeService;
+    @Autowired
+    private TicketPdfService ticketPdfService;
 
-    private final TicketRepository ticketRepository;
-    private final EventRepository eventRepository;
-
-    public TicketResponseDTO comprarBilhete(TicketRequestDTO dto) {
+    public byte[] comprarBilheteComPdf(TicketRequestDTO dto) throws Exception {
 
         User user = (User) SecurityContextHolder
                 .getContext()
@@ -41,6 +47,7 @@ public class TicketService {
             throw new RuntimeException("Evento esgotado.");
         }
 
+        // Criar bilhete
         Ticket ticket = new Ticket();
         ticket.setEvent(event);
         ticket.setClient(user);
@@ -53,7 +60,21 @@ public class TicketService {
 
         Ticket saved = ticketRepository.save(ticket);
 
-        return toDTO(saved);
+        // Gerar QR code
+        byte[] qr = qrCodeService.gerarImagemQRCode(saved.getQrCode());
+
+        // Gerar PDF do bilhete
+        byte[] pdf = ticketPdfService.gerarPdf(saved, qr);
+
+        return pdf; // Retorna o PDF para o front-end
+    }
+
+    private String gerarQrUnico() {
+        String qr;
+        do {
+            qr = UUID.randomUUID().toString();
+        } while (ticketRepository.existsByQrCode(qr));
+        return qr;
     }
 
     public Page<TicketResponseDTO> listarTicketsVendidos(Pageable pageable) {
@@ -78,15 +99,6 @@ public class TicketService {
         return ticketRepository
                 .findByEventId(eventId, pageable)
                 .map(this::toDTO);
-    }
-
-    private String gerarQrUnico() {
-        String qr;
-        do {
-            qr = UUID.randomUUID().toString();
-        } while (ticketRepository.existsByQrCode(qr));
-
-        return qr;
     }
 
     // 🎯 VALIDAÇÃO DO QR
